@@ -17,7 +17,6 @@ package org.creak.docversioning
 
 import java.util.UUID
 
-import net.liftweb.json.JsonAST.JValue
 import net.liftweb.json._
 import scala.collection._
 
@@ -33,16 +32,16 @@ import scala.collection._
  * {
  *   "_id":"<UUID>",
  *   "version":5,
- *   "property1": {
- *     "1":"key1",
- *     "4":"key2"
- *   },
+ *   "property1": [
+ *      {"version":1,"value":"key1"},
+ *      {"version":4,"value":"key2"}
+ *   ],
  *   "property2": {
- *     "1":"key1"
+ *     {"version":1,"value":"key1"}
  *   },
  *   "property3": {
- *     "1":"key1",
- *     "5":"key2"
+ *     {"version":1,"value":"key1"},
+ *     {"version":5,"value":"key2"}
  *   }
  * }
  *
@@ -50,34 +49,47 @@ import scala.collection._
  * document and optionally what version they wish to few, or how many versions are available. The user can then
  * also request the diff of specific versions to see what has changed from document to document.
  *
- * @param json the json value to start from
- *             the default json builds the _id field and the versionLimit field for you
- *
  * @author Michael Cuthbert on 2/23/15.
  */
-class JVerDocument[T](json:JValue/*=
-  s"""
-    |{
-    | "_id":"${UUID.randomUUID().toString}",
-    | "versionLimit":0
-    |}""".stripMargin*/) {
+class JVerDocument[T](
+    id:String,
+    private val _doc:Option[JVerDoc]=None
+)(implicit mf:Manifest[T]) {
 
   implicit val formats = DefaultFormats
 
   // stores all the documents in here
   // it lazy loads versions as the versions are requested
-  val versionHistory = mutable.Map[Int, List[FieldChange]]()
+  val versionHistory = mutable.Map[Int, T]()
 
-  // version 0 is the unsaved version of the document
-  var version = 0
-  var id = UUID.randomUUID().toString
+  val doc = _doc match {
+    case Some(d) => d
+    case None => loadDocument(id)
+  }
+
+  /**
+   * Loads the document from the storage mechanism that is supplied through the factory
+   *
+   * @param id
+   * @return
+   */
+  def loadDocument(id:String) : JVerDoc = {
+    JVerDoc("", 1, Map.empty[String, List[FieldChange]])
+  }
+
+  /**
+   * Saves the document to the storage mechanism that is supplied through the factory
+   */
+  def saveDocument() = {
+
+  }
 
   /**
    * Gets the latest document available
    *
    * @return
    */
-  //def getLatestDocument(includeID:Boolean=false) : T = getDocument(version, includeID)
+  def getLatestDocument() : T = getDocument(doc.version)
 
   /**
    * Gets the document for a specified version
@@ -85,42 +97,44 @@ class JVerDocument[T](json:JValue/*=
    * @param v The version of the document you are looking for
    * @return
    */
-  /*def getDocument(v:Int, includeID:Boolean=false) : T = {
+  def getDocument(v:Int) : T = {
+
     if (versionHistory.contains(v)) {
-      //versionHistory.get(v).get
-      {}.asInstanceOf[T]
+      versionHistory.get(v).get
     } else {
-      val retJSON =
-        s"""
-          ${
-          json map {
-            x => x
-          }
-        }
-        """.stripMargin
-      val newObj = parse(retJSON).extract[T]
-      //versionHistory.put(v, newObj)
-      newObj
+      val changes = doc.getVersion(v)
+      classOf[T].newInstance()
     }
   }
 
-  def updateDocument(newData:T) = {
-    val upVersion = version + 1
-    val upJSON =
-      s"""
-        "${JVerDocument.KeyVersion}":"$upVersion",
-        "${JVerDocument.KeyID}":"$id",
-        ${
-        json map {
-          x => x
+  /**
+   * This is like a github commit, commits a set of updates to a JVerDocument. Only when
+   * saveDocument is called will it actually save it to Storage
+   *
+   * @param newData
+   * @param userId
+   * @return
+   */
+  def updateDocument(newData:T, userId:Option[String]=None) : JVerDocument = {
+    val current = doc.getLatestVersion
+    val changes = classOf[T].getDeclaredFields flatMap {
+      field =>
+        val fieldName = field.getName
+        val upData = field.get(newData)
+        current.get(field.getName) match {
+          case Some(v) => if (v.canEqual(upData)) None else Some(fieldName -> upData)
+          case None => Some(fieldName -> upData)
         }
-      }
-      """.stripMargin
-    parse(upJSON).extract[T]
-  }*/
+    } toMap
+    JVerDocument(doc.update(changes, userId))
+  }
 }
 
 object JVerDocument {
   val KeyVersion = "version"
   val KeyID = "_id"
+
+  def apply[T]()(implicit mf:Manifest) = new JVerDocument[T](UUID.randomUUID().toString)
+  def apply[T](id:String)(implicit mf:Manifest) = new JVerDocument[T](id)
+  def apply[T](jVer:JVerDoc)(implicit mf:Manifest) = new JVerDocument[T](jVer._id, Some(jVer))
 }
