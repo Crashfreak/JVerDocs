@@ -115,7 +115,7 @@ class JVerDocument[T](
    * @param userId
    * @return
    */
-  def updateDocument(newData:T, userId:Option[String]=None) : JVerDocument = {
+  def updateDocument(newData:T, userId:Option[String]=None) : JVerDocument[T] = {
     val current = doc.getLatestVersion
     val changes = classOf[T].getDeclaredFields flatMap {
       field =>
@@ -126,7 +126,7 @@ class JVerDocument[T](
           case None => Some(fieldName -> upData)
         }
     } toMap
-    JVerDocument(doc.update(changes, userId))
+    JVerDocument[T](doc.update(changes, userId))
   }
 }
 
@@ -134,7 +134,7 @@ object JVerDocument {
   val KeyVersion = "version"
   val KeyID = "_id"
 
-  def apply[T]()(implicit mf:Manifest) = new JVerDocument[T](UUID.randomUUID().toString)
-  def apply[T](id:String)(implicit mf:Manifest) = new JVerDocument[T](id)
-  def apply[T](jVer:JVerDoc)(implicit mf:Manifest) = new JVerDocument[T](jVer._id, Some(jVer))
+  def apply[T]()(implicit mf:Manifest[T]) = new JVerDocument[T](UUID.randomUUID().toString)
+  def apply[T](id:String)(implicit mf:Manifest[T]) = new JVerDocument[T](id)
+  def apply[T](jVer:JVerDoc)(implicit mf:Manifest[T]) = new JVerDocument[T](jVer._id, Some(jVer))
 }

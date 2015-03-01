@@ -22,6 +22,34 @@ package org.creak.docversioning
 case class JVerDoc(_id:String, version:Int, changes:Map[String, List[FieldChange]], owner:Option[String]=None) {
 
   /**
+   * Gets the field changes for a specific version
+   *
+   * @param props The list of properties that you are looking for
+   * @param version The version you want, if None then will use the latest version
+   * @return
+   */
+  def getChanges(props:List[String], version:Option[Int]=None) : List[FieldChange] = props flatMap { x => getFieldChange(x, version) }
+
+  /**
+   * Gets the field change for a specific version
+   *
+   * @param prop Property you are requesting
+   * @param version the version you want, if None then will use the latest version
+   * @return
+   */
+  def getFieldChange(prop:String, version:Option[Int]=None) : Option[FieldChange] = {
+    changes.get(prop) match {
+      case Some(v) =>
+        val reqVer = version match {
+          case Some(ver) => ver
+          case None => this.version
+        }
+        Some(v flatMap { x => if (x.version <= reqVer) Some(x) else None } sortBy(- _.version) head)
+      case None => None
+    }
+  }
+
+  /**
    * Updates the document and returns a new JVerDoc
    *
    * @param newUpdates
@@ -93,9 +121,9 @@ case class JVerDoc(_id:String, version:Int, changes:Map[String, List[FieldChange
   def getVersion(version:Int) : Map[String, FieldChange] = {
     changes map {
       case x =>
-        val topVersion = x._2 flatMap { y => if (y.version <= version) Some(y) else None} sortBy(_.version)
+        val topVersion = x._2 flatMap { y => if (y.version <= version) Some(y) else None} sortBy(- _.version)
         x._1 -> topVersion.head
     }
   }
 }
-case class FieldChange(propertyName:String, value:Any, version:Int, user:Option[String])
+case class FieldChange(propertyName:String, value:Any, version:Int, user:Option[String]=None)
