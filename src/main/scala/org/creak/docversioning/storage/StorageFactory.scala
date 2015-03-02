@@ -31,7 +31,7 @@ trait StorageFactory[T] {
       case Some(sm) => sm
       case None =>
         if (classOf[StorageMech].isAssignableFrom(storageClass)) {
-          val sc = storageClass.newInstance().asInstanceOf[StorageMech]
+          val sc = storageClass.newInstance()
           storageMech = Some(sc)
           sc
         } else {

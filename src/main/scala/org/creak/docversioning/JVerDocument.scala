@@ -15,10 +15,9 @@
  */
 package org.creak.docversioning
 
-import java.util.UUID
-
 import org.creak.docversioning.storage.{StorageMech, MemoryDoc, StorageFactory}
 import scala.collection._
+import scala.reflect.ClassTag
 
 /**
  * A JVerDocument basically allows a user to maintain a version history of the document from storage.
@@ -69,6 +68,8 @@ class JVerDocument[T](
     }
   }
 
+  def getID = id
+
   /**
    * Gets the latest document available
    *
@@ -92,7 +93,6 @@ class JVerDocument[T](
     }
   }
 
-  /*
   /**
    * This is like a github commit, commits a set of updates to a JVerDocument. Only when
    * saveDocument is called will it actually save it to Storage
@@ -101,23 +101,23 @@ class JVerDocument[T](
    * @param userId
    * @return
    */
-  def updateDocument(newData:T, userId:Option[String]=None) : Unit = {
+  def updateDocument(newData:T, userId:Option[String]=None) : JVerDocument[T] = {
     val current = doc.getChangeVersion()
-    val changes = classOf[T].getDeclaredFields flatMap {
+    val dataMap = (Map[String, Any]() /: newData.getClass.getDeclaredFields) {(a, f) =>
+      f.setAccessible(true)
+      a + (f.getName -> f.get(newData))
+    }
+    val changes = dataMap flatMap {
       field =>
-        val fieldName = field.getName
-        val upData = field.get(newData)
-        current.get(field.getName) match {
-          case Some(v) => if (v.canEqual(upData)) None else Some(fieldName -> upData)
-          case None => Some(fieldName -> upData)
+        if (field._1.equalsIgnoreCase("$outer")) None
+        else {
+          current.get(field._1) match {
+            case Some(v) => if (v.canEqual(field._2)) None else Some(field._1 -> field._2)
+            case None => Some(field._1 -> field._2)
+          }
         }
     } toMap
-    JVerDocument[T](doc.update(changes, userId))
-  }*/
-}
 
-object JVerDocument {
-  def apply[T](id:String=UUID.randomUUID().toString,
-               storageClass:Class[_<:StorageMech]=classOf[MemoryDoc])(implicit mf:Manifest[T]) =
-    new JVerDocument[T](UUID.randomUUID().toString, storageClass)
+    new JVerDocument[T](id, storageClass, Some(doc.update(changes, userId)))
+  }
 }
