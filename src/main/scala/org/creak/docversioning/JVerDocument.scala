@@ -1,23 +1,23 @@
 /*
  * Copyright 2015 Michael Cuthbert
  *
- *    Licensed under the Apache License, Version 2.0 (the "License");
- *    you may not use this file except in compliance with the License.
- *    You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *        http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS,
- *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *    See the License for the specific language governing permissions and
- *    limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package org.creak.docversioning
 
 import java.util.UUID
 
-import net.liftweb.json._
+import org.creak.docversioning.storage.{StorageMech, MemoryDoc, StorageFactory}
 import scala.collection._
 
 /**
@@ -32,16 +32,17 @@ import scala.collection._
  * {
  *   "_id":"<UUID>",
  *   "version":5,
+ *   "owner":"<OWNER_ID>"
  *   "property1": [
- *      {"version":1,"value":"key1"},
- *      {"version":4,"value":"key2"}
+ *      {"version":1,"value":"key1","userId":"<USER_ID>"},
+ *      {"version":4,"value":"key2","userId":"<USER_ID>"}
  *   ],
  *   "property2": {
- *     {"version":1,"value":"key1"}
+ *     {"version":1,"value":"key1","userId":"<USER_ID>"}
  *   },
  *   "property3": {
- *     {"version":1,"value":"key1"},
- *     {"version":5,"value":"key2"}
+ *     {"version":1,"value":"key1","userId":"<USER_ID>"},
+ *     {"version":5,"value":"key2","userId":"<USER_ID>"}
  *   }
  * }
  *
@@ -53,35 +54,19 @@ import scala.collection._
  */
 class JVerDocument[T](
     id:String,
+    implicit val storageClass:Class[_<:StorageMech]=classOf[MemoryDoc],
     private val _doc:Option[JVerDoc]=None
-)(implicit mf:Manifest[T]) {
-
-  implicit val formats = DefaultFormats
-
+)(implicit mf:Manifest[T]) extends StorageFactory[T] {
   // stores all the documents in here
   // it lazy loads versions as the versions are requested
   val versionHistory = mutable.Map[Int, T]()
 
   val doc = _doc match {
     case Some(d) => d
-    case None => loadDocument(id)
-  }
-
-  /**
-   * Loads the document from the storage mechanism that is supplied through the factory
-   *
-   * @param id
-   * @return
-   */
-  def loadDocument(id:String) : JVerDoc = {
-    JVerDoc("", 1, Map.empty[String, List[FieldChange]])
-  }
-
-  /**
-   * Saves the document to the storage mechanism that is supplied through the factory
-   */
-  def saveDocument() = {
-
+    case None => loadDocument(id) match {
+      case Some(dc) => dc
+      case None => throw new Exception(s"Doc with id [$id] not found.")
+    }
   }
 
   /**
@@ -98,15 +83,16 @@ class JVerDocument[T](
    * @return
    */
   def getDocument(v:Int) : T = {
-
     if (versionHistory.contains(v)) {
       versionHistory.get(v).get
     } else {
-      val changes = doc.getVersion(v)
-      classOf[T].newInstance()
+      val currentDoc = doc.getVersion(Some(v))
+      versionHistory.put(v, currentDoc)
+      currentDoc
     }
   }
 
+  /*
   /**
    * This is like a github commit, commits a set of updates to a JVerDocument. Only when
    * saveDocument is called will it actually save it to Storage
@@ -115,8 +101,8 @@ class JVerDocument[T](
    * @param userId
    * @return
    */
-  def updateDocument(newData:T, userId:Option[String]=None) : JVerDocument[T] = {
-    val current = doc.getLatestVersion
+  def updateDocument(newData:T, userId:Option[String]=None) : Unit = {
+    val current = doc.getChangeVersion()
     val changes = classOf[T].getDeclaredFields flatMap {
       field =>
         val fieldName = field.getName
@@ -127,14 +113,11 @@ class JVerDocument[T](
         }
     } toMap
     JVerDocument[T](doc.update(changes, userId))
-  }
+  }*/
 }
 
 object JVerDocument {
-  val KeyVersion = "version"
-  val KeyID = "_id"
-
-  def apply[T]()(implicit mf:Manifest[T]) = new JVerDocument[T](UUID.randomUUID().toString)
-  def apply[T](id:String)(implicit mf:Manifest[T]) = new JVerDocument[T](id)
-  def apply[T](jVer:JVerDoc)(implicit mf:Manifest[T]) = new JVerDocument[T](jVer._id, Some(jVer))
+  def apply[T](id:String=UUID.randomUUID().toString,
+               storageClass:Class[_<:StorageMech]=classOf[MemoryDoc])(implicit mf:Manifest[T]) =
+    new JVerDocument[T](UUID.randomUUID().toString, storageClass)
 }

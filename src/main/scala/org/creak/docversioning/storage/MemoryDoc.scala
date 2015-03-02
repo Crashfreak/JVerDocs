@@ -16,19 +16,31 @@
 
 package org.creak.docversioning.storage
 
-import org.creak.docversioning.JVerDocument
+import org.creak.docversioning.JVerDoc
+
+import scala.collection.mutable
 
 /**
  * Adds functions that automatically manages the storage of the documents in memory
  *
  * @author Michael Cuthbert on 2/25/15.
  */
-trait MemoryDoc {
-  //this: JVerDocument =>
+class MemoryDoc extends StorageMech {
+  val memoryMap = mutable.Map[String, JVerDoc]()
 
-  // we just dump it into a map that holds all the documents, based on the _id from the DOC
+  /**
+   * Saves the document to whichever storage for the class
+   *
+   * @param doc
+   * @return
+   */
+  override def saveDocument(doc: JVerDoc): Unit = memoryMap.put(doc._id, doc)
 
-  def write() = {
-
-  }
+  /**
+   * Loads the document to whichever storage for the class
+   *
+   * @param id
+   * @return
+   */
+  override def loadDocument(id: String): Option[JVerDoc] = memoryMap.get(id)
 }

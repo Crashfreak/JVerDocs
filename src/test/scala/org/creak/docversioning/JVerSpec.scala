@@ -1,6 +1,23 @@
+/*
+ * Copyright 2015 Michael Cuthbert
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
 package org.creak.docversioning
 
 import org.scalatest.FlatSpec
+import net.liftweb.json._
 
 /**
  * Created by mgcuthbert on 2/27/2015.
@@ -106,7 +123,7 @@ class JVerSpec extends FlatSpec {
   }
 
   it should "get a specific version of the document" in {
-    doc.getVersion(3) foreach {
+    doc.getChangeVersion(Some(3)) foreach {
       x =>
         if (x._1 == "prop1") assert(x._2.version == 1 && x._2.value == "val1")
         else if (x._1 == "prop2") assert(x._2.version == 3 && x._2.value == "val56")
@@ -114,7 +131,7 @@ class JVerSpec extends FlatSpec {
         else if (x._1 == "prop4") assert(x._2.version == 3 && x._2.value == "changed")
         else assert(1==2, "Unexpected property")
     }
-    doc.getLatestVersion foreach {
+    doc.getChangeVersion() foreach {
       x =>
         if (x._1 == "prop1") assert(x._2.version == 1 && x._2.value == "val1")
         else if (x._1 == "prop2") assert(x._2.version == 5 && x._2.value == "finalValue")
@@ -122,5 +139,21 @@ class JVerSpec extends FlatSpec {
         else if (x._1 == "prop4") assert(x._2.version == 3 && x._2.value == "changed")
         else assert(1==2, "Unexpected property")
     }
+  }
+
+  it should "get a JSON version of the change versions" in {
+    assert(compact(render(doc.getJSONVersion(Some(3)))) == """{"prop1":"val1","prop2":"val56","prop3":"val3","prop4":"changed"}""")
+  }
+
+  it should "get a case class version of the change versions" in {
+    case class test(prop1:String, prop2:String, prop3:String, prop4:String)
+    val t1 = doc.getVersion[test](Some(3))
+    val t2 = test("val1", "val56", "val3", "changed")
+    assert(t1 == t2)
+
+    case class test2(StringProp:String, IntProp:Int, DoubleProp:Double, CaseClassProp:Prop)
+    val te1 = doc2.getVersion[test2]()
+    val te2 = test2("stringvalue", 1, 1.0, Prop(1, "test", 1.0))
+    assert(te1.canEqual(te2))
   }
 }

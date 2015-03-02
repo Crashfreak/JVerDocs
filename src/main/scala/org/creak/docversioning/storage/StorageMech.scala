@@ -1,13 +1,41 @@
+/*
+ * Copyright 2015 Michael Cuthbert
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
 package org.creak.docversioning.storage
 
-import org.creak.docversioning.JVerDocument
+import org.creak.docversioning.JVerDoc
 
 /**
+ * The trait that is used for any storage mechanism docs
+ *
  * Created by mgcuthbert on 3/1/2015.
  */
-abstract class StorageMech {
+trait StorageMech {
+  /**
+   * Saves the document to whichever storage for the class
+   *
+   * @param doc
+   * @return
+   */
+  def saveDocument(doc:JVerDoc)
 
-  implicit val doc:JVerDocument
-
-  def writeDocument(doc:JVerDocument)
+  /**
+   * Loads the document to whichever storage for the class
+   *
+   * @param id
+   * @return
+   */
+  def loadDocument(id:String) : Option[JVerDoc]
 }

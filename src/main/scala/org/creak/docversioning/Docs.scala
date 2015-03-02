@@ -16,10 +16,16 @@
 
 package org.creak.docversioning
 
+import net.liftweb.json._
+import net.liftweb.json.Extraction._
+import net.liftweb.json.JsonAST.JValue
+
 /**
  * @author Michael Cuthbert on 2/25/15.
  */
 case class JVerDoc(_id:String, version:Int, changes:Map[String, List[FieldChange]], owner:Option[String]=None) {
+
+  implicit val formats = DefaultFormats
 
   /**
    * Gets the field changes for a specific version
@@ -105,25 +111,44 @@ case class JVerDoc(_id:String, version:Int, changes:Map[String, List[FieldChange
   }
 
   /**
-   * Quick helper function to get the latest version, just uses "getVersion" with the current version
-   *
-   * @return
-   */
-  def getLatestVersion : Map[String, FieldChange] = getVersion(version)
-
-  /**
    * Gets the version and it's changes. This differs from getVersionChanges because it will get the latest
    * changes for every single version and not just the changes for the version you are looking for
    *
    * @param version
    * @return
    */
-  def getVersion(version:Int) : Map[String, FieldChange] = {
+  def getChangeVersion(version:Option[Int]=None) : Map[String, FieldChange] = {
+    val reqVer = version match {
+      case Some(v) => v
+      case None => this.version
+    }
     changes map {
       case x =>
-        val topVersion = x._2 flatMap { y => if (y.version <= version) Some(y) else None} sortBy(- _.version)
+        val topVersion = x._2 flatMap { y => if (y.version <= reqVer) Some(y) else None} sortBy(- _.version)
         x._1 -> topVersion.head
     }
   }
+
+  /**
+   * Gets a JSON version (JValue from lift-json)
+   * Use compact(render(x)) to get to String
+   *
+   * @param version The version you are looking for, None will set to current version
+   * @return
+   */
+  def getJSONVersion(version:Option[Int]=None) : JValue =
+    decompose(getChangeVersion(version) map {
+      x => x._1 -> x._2.value
+    })
+
+  /**
+   * Gets the current version and converts it to a case class
+   *
+   * @param version The version you are looking for
+   * @param mf the manifest for the case class
+   * @tparam T the case class type
+   * @return
+   */
+  def getVersion[T](version:Option[Int]=None)(implicit mf:Manifest[T]) : T = getJSONVersion(version).extract[T]
 }
 case class FieldChange(propertyName:String, value:Any, version:Int, user:Option[String]=None)
